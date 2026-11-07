@@ -1,0 +1,7 @@
+particles,configuration,dem_substeps,mean_step_s,dem_s,neighbor_list_s,fluid_s,coupling_s,status
+20009859,uniform_neighbor_search_rebuild_every_substep,16,17.8,,15.300,,,completed
+20009859,uniform_neighbor_search_rebuild_once_per_cfd_step,16,3.49,,,,,completed
+80039438,uniform_neighbor_search,16,,,,,,crashed_32bit_csr_overflow
+80039438,size_aware_3bin_neighbor_search,16,3.700,2.355,1.873,1.22,0.111,completed
+80039438,size_aware_3bin_neighbor_search,4,3.390,2.000,1.871,,,completed
+180000037,size_aware_3bin_neighbor_search,6,6.012,4.486,4.067,1.27,0.256,completed

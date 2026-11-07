@@ -1,4 +1,31 @@
-# C90 rotational-sector simulation
+# C90 rotational-sector CFD-DEM on GPUs
+
+GPU-accelerated coupled fluid–particle (CFD-DEM) simulation of a syringe
+injector. The project spans a symmetry-reduced formulation, CUDA performance
+engineering on NVIDIA H100s, and rigorous accuracy validation against the
+full-cylinder simulation.
+
+## GPU engineering highlights
+
+| Result | Number | Details |
+|---|---:|---|
+| Particles on one H100 (80 GB) | **180 million** at 6.0 s/step | [capacity study](docs/gpu-scaling-and-capacity.md#1-180-million-particles-on-one-h100) |
+| Neighbor-candidate reduction that fixed a 32-bit CSR overflow crash at 80M particles | **203.5×** (31.2B → 153M) | [overflow diagnosis](docs/gpu-scaling-and-capacity.md#1-180-million-particles-on-one-h100) |
+| Profile-guided neighbor-list fix at 20M particles | **5.1×** step speedup | [rebuild study](docs/gpu-scaling-and-capacity.md#1-180-million-particles-on-one-h100) |
+| Spatial particle sorting (Nsight-guided) | **52.8%** lower DEM-substep time | [DEM campaign](docs/gpu-performance.md#large-particle-dem-optimization-campaign) |
+| GPU ELLPACK cache of a recursive Galerkin multigrid operator | **30.1%** faster step, exact to `6e-15` | [pressure solver](docs/gpu-scaling-and-capacity.md#2-accelerating-the-rotational-pressure-projection-c90) |
+| Removing device–host syncs in the multigrid hierarchy | **33.2%** faster step | [pressure solver](docs/gpu-scaling-and-capacity.md#2-accelerating-the-rotational-pressure-projection-c90) |
+| Best-iterate Krylov bottom solver | **2.04×** faster pressure solve | [pressure solver](docs/gpu-scaling-and-capacity.md#2-accelerating-the-rotational-pressure-projection-c90) |
+| C90 sector vs. full cylinder at 0.11% pressure error | **1.28×** throughput | [pressure solver](docs/gpu-scaling-and-capacity.md#2-accelerating-the-rotational-pressure-projection-c90) |
+| Multi-GPU strong scaling on 1–8 H100s, with root-cause analysis | measured honestly | [scaling](docs/gpu-scaling-and-capacity.md#3-multi-gpu-strong-scaling) |
+| Cross-rank (two-GPU MPI) seam-contact symmetry | `2.78e-15` | [validation](docs/validation-results.md) |
+
+Tools used: CUDA on NVIDIA H100, AMReX/MFiX-Exa, MPI, Nsight Compute, nested
+GPU timers, and matched A/B testing with accuracy gates.
+
+![Particle capacity on one H100](figures/performance/single_gpu_particle_capacity.png)
+
+## Project scope
 
 This repository documents the formulation and validation of a 90-degree
 rotationally periodic sector for a coupled gas–particle cylinder calculation.
@@ -102,6 +129,11 @@ plotting scripts.
   sanitized result tables.
 - [`docs/gpu-performance.md`](docs/gpu-performance.md) — GPU optimization
   strategy, profiling methodology, and performance/accuracy tradeoffs.
+- [`docs/gpu-scaling-and-capacity.md`](docs/gpu-scaling-and-capacity.md) —
+  180M-particle single-GPU capacity, pressure-solver acceleration, and
+  multi-GPU strong scaling.
+- [`data/benchmarks/`](data/benchmarks/README.md) — benchmark tables behind
+  the performance figures.
 - [`docs/limitations.md`](docs/limitations.md) — unresolved and unqualified
   behavior.
 - [`data/README.md`](data/README.md) — public data schemas.

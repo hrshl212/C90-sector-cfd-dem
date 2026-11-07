@@ -33,3 +33,11 @@ Use `--full-particles` only when the full-cylinder particles are stored in a
 different plotfile directory from its flow fields. The piston overlay defaults
 to `z0 = 0.2 mm`, speed `1.7 mm/s`, and radius `4.33 mm`; the corresponding
 `--piston-z0`, `--piston-speed`, and `--piston-radius` options use SI units.
+
+`plot_gpu_benchmarks.py` reads the tables in `data/benchmarks/` and writes the
+single-GPU capacity and multi-GPU strong-scaling figures used in
+[`docs/gpu-scaling-and-capacity.md`](../docs/gpu-scaling-and-capacity.md).
+
+```bash
+python3 scripts/plot_gpu_benchmarks.py --output-dir build/figures
+```

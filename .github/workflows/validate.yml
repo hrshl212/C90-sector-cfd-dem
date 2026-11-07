@@ -19,3 +19,4 @@ jobs:
           --count-csv data/sanitized/particle_count_timeseries.csv
           --output-dir build/figures
       - run: python3 scripts/check_release.py
+      - run: python3 scripts/plot_gpu_benchmarks.py --output-dir build/figures

@@ -1,0 +1,8 @@
+optimization,control_s,candidate_s,metric
+one_rank_no_sync_galerkin_hierarchy,13.8772,9.2724,mean_step3_time
+fused_interpolation_and_clear,7.9887,7.5969,mean_step3_time
+in_place_fine_prolongation,7.5969,7.2566,mean_step3_time
+exact_ell_cache_of_recursive_galerkin_operator,7.2566,5.0748,step3_time
+best_iterate_krylov_bottom_solver_nodal_total,1822.72,895.536,summed_nodal_solve_time_90_steps
+best_iterate_krylov_bottom_solver_wall,1891,976,wall_time_90_steps
+c90_sector_vs_full360_cylinder,325.84893,254.63996,summed_step_time_steps_21_100
