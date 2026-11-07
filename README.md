@@ -17,6 +17,8 @@ full-cylinder simulation.
 | Removing device–host syncs in the multigrid hierarchy | **33.2%** faster step | [pressure solver](docs/gpu-scaling-and-capacity.md#2-accelerating-the-rotational-pressure-projection-c90) |
 | Best-iterate Krylov bottom solver | **2.04×** faster pressure solve | [pressure solver](docs/gpu-scaling-and-capacity.md#2-accelerating-the-rotational-pressure-projection-c90) |
 | C90 sector vs. full cylinder at 0.11% pressure error | **1.28×** throughput | [pressure solver](docs/gpu-scaling-and-capacity.md#2-accelerating-the-rotational-pressure-projection-c90) |
+| CUDA-aware MPI over NVLink vs. host-staged MPI (128 MiB GPU-to-GPU) | **51×** bandwidth (384 GB/s) | [CUDA-aware MPI](docs/gpu-scaling-and-capacity.md#4-cuda-aware-mpi) |
+| 8-GPU halo exchange with GPU pack/unpack, CUDA-aware vs. staged | **11.2×** faster | [CUDA-aware MPI](docs/gpu-scaling-and-capacity.md#4-cuda-aware-mpi) |
 | Multi-GPU strong scaling on 1–8 H100s, with root-cause analysis | measured honestly | [scaling](docs/gpu-scaling-and-capacity.md#3-multi-gpu-strong-scaling) |
 | Cross-rank (two-GPU MPI) seam-contact symmetry | `2.78e-15` | [validation](docs/validation-results.md) |
 
@@ -130,10 +132,12 @@ plotting scripts.
 - [`docs/gpu-performance.md`](docs/gpu-performance.md) — GPU optimization
   strategy, profiling methodology, and performance/accuracy tradeoffs.
 - [`docs/gpu-scaling-and-capacity.md`](docs/gpu-scaling-and-capacity.md) —
-  180M-particle single-GPU capacity, pressure-solver acceleration, and
-  multi-GPU strong scaling.
+  180M-particle single-GPU capacity, pressure-solver acceleration,
+  multi-GPU strong scaling, and CUDA-aware MPI benchmarks.
 - [`data/benchmarks/`](data/benchmarks/README.md) — benchmark tables behind
   the performance figures.
+- [`benchmarks/cuda_aware_mpi/`](benchmarks/cuda_aware_mpi/README.md) —
+  standalone CUDA + MPI microbenchmark (ping-pong and GPU halo exchange).
 - [`docs/limitations.md`](docs/limitations.md) — unresolved and unqualified
   behavior.
 - [`data/README.md`](data/README.md) — public data schemas.

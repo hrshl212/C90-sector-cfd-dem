@@ -114,6 +114,54 @@ def plot_scaling(data: Path, out: Path) -> None:
     plt.close(fig)
 
 
+def plot_cuda_aware_mpi(data: Path, out: Path) -> None:
+    ping = rows(data / "cuda_aware_mpi_pingpong.csv")
+    halo = rows(data / "cuda_aware_mpi_halo.csv")
+    fig, (left, right) = plt.subplots(1, 2, figsize=(10.5, 4.3), dpi=150,
+                                      gridspec_kw={"width_ratios": [1.25, 1]})
+    series = (("nvlink_same_node", "pml_ucx", "device", "NVLink, CUDA-aware", GREEN, "-"),
+              ("nvlink_same_node", "pml_ucx", "staged", "NVLink, host-staged", GREEN, ":"),
+              ("infiniband_two_nodes", "pml_ucx", "device", "InfiniBand, CUDA-aware", RUST, "-"),
+              ("infiniband_two_nodes", "pml_ucx", "staged", "InfiniBand, host-staged", RUST, ":"),
+              ("two_nodes", "pml_ob1_tcp", "device", "previous ob1/TCP, two nodes", GRAY, "--"))
+    for link, transport, buf, label, color, ls in series:
+        sel = [r for r in ping if r["link"] == link and r["mpi_transport"] == transport
+               and r["buffer"] == buf and float(r["bandwidth_GBs"]) > 0]
+        left.plot([int(r["bytes"]) for r in sel], [float(r["bandwidth_GBs"]) for r in sel],
+                  ls, color=color, label=label, lw=1.8)
+    left.set_xscale("log", base=2)
+    left.set_yscale("log")
+    left.set_xlabel("Message size (bytes)", color=INK)
+    left.set_ylabel("Ping-pong bandwidth (GB/s)", color=INK)
+    left.set_title("GPU-to-GPU MPI bandwidth: 384 GB/s over NVLink",
+                   color=INK, loc="left", fontsize=11)
+    left.legend(frameon=False, fontsize=7.5, loc="upper left")
+    style(left)
+
+    groups = [("one_node", g) for g in ("1", "2", "4", "8")] + [("two_nodes_4_gpus_each", "8")]
+    labels, dev, stg = [], [], []
+    for layout, gpus in groups:
+        pick = {r["buffer"]: float(r["exchange_ms"]) for r in halo
+                if r["layout"] == layout and r["gpus"] == gpus and r["block_N"] == "384"}
+        labels.append(f"{gpus} GPU{'s' if gpus != '1' else ''}\n"
+                      + ("1 node" if layout == "one_node" else "2 nodes"))
+        dev.append(pick["device"])
+        stg.append(pick["staged"])
+    x = range(len(labels))
+    right.bar([i - 0.19 for i in x], stg, 0.38, color=GRAY, label="host-staged")
+    right.bar([i + 0.19 for i in x], dev, 0.38, color=GREEN, label="CUDA-aware")
+    for i, (d, s) in enumerate(zip(dev, stg)):
+        right.text(i, max(d, s) + 0.03, f"{s / d:.1f}x", ha="center", fontsize=8.5, color=INK)
+    right.set_xticks(list(x), labels, fontsize=8)
+    right.set_ylabel("Halo exchange time (ms), 384^3 block per GPU", color=INK)
+    right.set_title("6-face halo exchange, weak scaling", color=INK, loc="left", fontsize=11)
+    right.legend(frameon=False, fontsize=8, loc="upper left")
+    style(right)
+    fig.tight_layout()
+    fig.savefig(out / "cuda_aware_mpi.png")
+    plt.close(fig)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, default=ROOT / "data" / "benchmarks")
@@ -122,6 +170,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     plot_capacity(args.data_dir, args.output_dir)
     plot_scaling(args.data_dir, args.output_dir)
+    plot_cuda_aware_mpi(args.data_dir, args.output_dir)
     print(f"wrote figures to {args.output_dir}")
 
 

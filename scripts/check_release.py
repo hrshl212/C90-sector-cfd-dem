@@ -32,7 +32,7 @@ REQUIRED = (
     "figures/validation/piston_fluid_force_c90_vs_full360_interim.png",
     "figures/validation/particle_count_c90_vs_full360_interim.png",
 )
-TEXT_SUFFIXES = {".md", ".py", ".yml", ".yaml", ".cff", ".txt", ".csv", ".svg"}
+TEXT_SUFFIXES = {".md", ".py", ".cu", ".cpp", ".h", ".sh", ".yml", ".yaml", ".cff", ".txt", ".csv", ".svg"}
 PROHIBITED = (
     re.compile("/" + "scratch" + "/", re.IGNORECASE),
     re.compile("private" + "_validation", re.IGNORECASE),

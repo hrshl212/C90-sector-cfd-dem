@@ -1,12 +1,14 @@
 # GPU capacity, solver acceleration, and multi-GPU scaling
 
-This page extends [GPU performance engineering](gpu-performance.md) with three
+This page extends [GPU performance engineering](gpu-performance.md) with four
 measured campaigns from the same rotational-sector CFD-DEM framework:
 
 1. pushing one NVIDIA H100 from 20 million to 180 million particles;
 2. accelerating the rotational pressure projection with a GPU sparse-operator cache,
    synchronization removal, kernel fusion, and a better Krylov bottom solver; and
-3. measuring multi-GPU strong scaling and explaining why it did not pay off.
+3. measuring multi-GPU strong scaling and explaining why it did not pay off; and
+4. measuring what CUDA-aware MPI gains over host-staged MPI on the same H100
+   nodes.
 
 Every number below comes from a completed run and a matched control. The raw
 tables are in [`data/benchmarks/`](../data/benchmarks/README.md), and
@@ -176,8 +178,71 @@ the single-GPU optimizations above. A multi-GPU speedup would first require:
 - a sustained multi-rank validation of the coupled pressure solve, which is
   listed as unqualified in [limitations](limitations.md).
 
-No GPU-aware MPI timing is claimed here. Those runs were not part of the
-qualified campaign.
+These scaling runs used Open MPI's `ob1` PML over TCP and shared-memory BTLs,
+which stage every GPU message through host memory. Section 4 measures the
+CUDA-aware alternative directly.
+
+## 4. CUDA-aware MPI
+
+A distributed GPU solver spends its communication time in ghost-cell (halo)
+exchanges. With an MPI that is not CUDA-aware, every message makes a
+device→host copy, a host send, and a host→device copy. A standalone
+microbenchmark,
+[`benchmarks/cuda_aware_mpi`](../benchmarks/cuda_aware_mpi/README.md),
+compares that host-staged path with passing GPU pointers straight to MPI. The
+run used Open MPI 4.1.6 + UCX 1.17 on H100 nodes with eight NVLink-connected
+GPUs each, joined by InfiniBand. Every received buffer was verified on the GPU.
+
+![CUDA-aware MPI bandwidth and halo exchange](../figures/performance/cuda_aware_mpi.png)
+
+**Point-to-point bandwidth at 128 MiB** (ping-pong between two GPUs):
+
+| Link | CUDA-aware (GPU pointers) | Host-staged | Previous `ob1`/TCP path | CUDA-aware vs. staged |
+|---|---:|---:|---:|---:|
+| Two GPUs in one node (NVLink) | **384.3 GB/s** | 7.50 GB/s | 2.01 GB/s | **51×** |
+| Two nodes (InfiniBand) | **33.8 GB/s** | 18.1 GB/s | 2.11 GB/s | 1.9× |
+
+Across nodes the CUDA-aware path is also **16×** faster than the `ob1`/TCP
+configuration used for the strong-scaling runs in section 3. For tiny messages
+there is no gain: 8-byte latency is about 18–20 µs in every mode. The benefit
+comes from bandwidth-bound transfers such as ghost-cell faces.
+
+**Six-face halo exchange**, with a 384³ double block per GPU (1.18 MB per
+face), packed and unpacked by GPU kernels. Per-GPU work is fixed, so this is
+weak scaling:
+
+| GPUs | Nodes | CUDA-aware | Host-staged | Speedup |
+|---:|---:|---:|---:|---:|
+| 1 | 1 | 0.101 ms | 0.986 ms | 9.7× |
+| 2 | 1 | 0.110 ms | 1.116 ms | 10.1× |
+| 4 | 1 | 0.402 ms | 0.998 ms | 2.5× |
+| 8 | 1 | **0.121 ms** | 1.355 ms | **11.2×** |
+| 8 | 2 | 0.311 ms | 1.034 ms | 3.3× |
+
+On one node the CUDA-aware exchange stays near 0.1 ms from 1 to 8 GPUs, while
+the staged exchange grows. The 4-GPU case is an unexplained outlier that was
+not investigated further. Splitting the 8 GPUs over two nodes puts some faces
+on InfiniBand and raises the time to 0.31 ms. That is still 3.3× faster than
+staging.
+
+**What the fabric did and did not support.** These findings are part of the
+result:
+
+- **GPUDirect RDMA was unavailable.** The InfiniBand adapters rejected
+  registration of GPU memory. With `UCX_IB_GPU_DIRECT_RDMA=no`, UCX still
+  accepts device pointers but pipelines them through host memory internally.
+  The inter-node CUDA-aware numbers are therefore not GPUDirect numbers, and
+  real GPUDirect RDMA hardware would be expected to do better.
+- **UCX's UD transport timed out** on this fabric, including for wire-up
+  between nodes. Pinning `UCX_TLS` (`cuda_ipc` within a node, RC between
+  nodes) made every run complete. One node consistently failed the
+  inter-node test and was excluded.
+
+**Scope.** This is a communication microbenchmark, not a coupled CFD-DEM
+timing. It shows the communication path a decomposed solver would use, but it
+does not change the section 3 conclusion. The C90 production case still runs
+fastest on one GPU, and sustained coupled multi-rank pressure solves remain
+unqualified (see [limitations](limitations.md)).
 
 ## Engineering practices shown
 
@@ -189,5 +254,8 @@ qualified campaign.
   traced to an algorithmic candidate explosion and fixed by size-aware binning.
 - **Accept the accuracy budget explicitly.** Faster but less accurate
   configurations were rejected with documented error numbers.
+- **Measure the communication path directly.** A CUDA-aware MPI
+  microbenchmark quantified the gain over host staging and exposed fabric
+  limitations, including missing GPUDirect RDMA and a broken UD transport.
 - **Report negative results.** Multi-GPU slowdowns, slower fusions, and unsafe
   list reuse are documented alongside the wins.
