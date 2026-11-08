@@ -19,6 +19,8 @@ full-cylinder simulation.
 | C90 sector vs. full cylinder at 0.11% pressure error | **1.28×** throughput | [pressure solver](docs/gpu-scaling-and-capacity.md#2-accelerating-the-rotational-pressure-projection-c90) |
 | CUDA-aware MPI over NVLink vs. host-staged MPI (128 MiB GPU-to-GPU) | **51×** bandwidth (384 GB/s) | [CUDA-aware MPI](docs/gpu-scaling-and-capacity.md#4-cuda-aware-mpi) |
 | 8-GPU halo exchange with GPU pack/unpack, CUDA-aware vs. staged | **11.2×** faster | [CUDA-aware MPI](docs/gpu-scaling-and-capacity.md#4-cuda-aware-mpi) |
+| 20M-particle MFiX-Exa CFD-DEM step on 4 H100s with CUDA-aware MPI | **1.92×** vs. 1 GPU | [multi-GPU MFiX-Exa](docs/gpu-scaling-and-capacity.md#5-multi-gpu-mfix-exa-with-cuda-aware-mpi-20m-particles) |
+| DEM ghost-particle exchange inside MFiX-Exa, CUDA-aware vs. staged (4 GPUs) | **3.0×** faster | [multi-GPU MFiX-Exa](docs/gpu-scaling-and-capacity.md#5-multi-gpu-mfix-exa-with-cuda-aware-mpi-20m-particles) |
 | Multi-GPU strong scaling on 1–8 H100s, with root-cause analysis | measured honestly | [scaling](docs/gpu-scaling-and-capacity.md#3-multi-gpu-strong-scaling) |
 | Cross-rank (two-GPU MPI) seam-contact symmetry | `2.78e-15` | [validation](docs/validation-results.md) |
 
@@ -133,7 +135,8 @@ plotting scripts.
   strategy, profiling methodology, and performance/accuracy tradeoffs.
 - [`docs/gpu-scaling-and-capacity.md`](docs/gpu-scaling-and-capacity.md) —
   180M-particle single-GPU capacity, pressure-solver acceleration,
-  multi-GPU strong scaling, and CUDA-aware MPI benchmarks.
+  multi-GPU strong scaling, CUDA-aware MPI benchmarks, and a 20M-particle
+  multi-GPU MFiX-Exa run with CUDA-aware MPI.
 - [`data/benchmarks/`](data/benchmarks/README.md) — benchmark tables behind
   the performance figures.
 - [`benchmarks/cuda_aware_mpi/`](benchmarks/cuda_aware_mpi/README.md) —

@@ -1,6 +1,6 @@
 # GPU capacity, solver acceleration, and multi-GPU scaling
 
-This page extends [GPU performance engineering](gpu-performance.md) with four
+This page extends [GPU performance engineering](gpu-performance.md) with five
 measured campaigns from the same rotational-sector CFD-DEM framework:
 
 1. pushing one NVIDIA H100 from 20 million to 180 million particles;
@@ -8,7 +8,9 @@ measured campaigns from the same rotational-sector CFD-DEM framework:
    synchronization removal, kernel fusion, and a better Krylov bottom solver; and
 3. measuring multi-GPU strong scaling and explaining why it did not pay off; and
 4. measuring what CUDA-aware MPI gains over host-staged MPI on the same H100
-   nodes.
+   nodes; and
+5. running a 20-million-particle MFiX-Exa case on 1, 2, and 4 H100s with
+   CUDA-aware MPI switched on inside the solver.
 
 Every number below comes from a completed run and a matched control. The raw
 tables are in [`data/benchmarks/`](../data/benchmarks/README.md), and
@@ -244,6 +246,60 @@ does not change the section 3 conclusion. The C90 production case still runs
 fastest on one GPU, and sustained coupled multi-rank pressure solves remain
 unqualified (see [limitations](limitations.md)).
 
+## 5. Multi-GPU MFiX-Exa with CUDA-aware MPI (20M particles)
+
+Section 4 measured the communication path in isolation. This campaign turns it
+on inside the coupled solver. MFiX-Exa was rebuilt against the same
+CUDA-aware Open MPI 4.1.6 + UCX stack and run with 20,009,859 particles on 1,
+2, and 4 H100s in one node. Each multi-GPU case ran with AMReX's
+`use_gpu_aware_mpi` off (buffers staged through host memory) and on (GPU
+pointers handed to MPI over NVLink).
+
+This is a capability demonstration, not a production run:
+
+- each case runs five CFD steps;
+- the cyclic rotational boundary is disabled, because the sustained coupled
+  multi-rank cyclic pressure solve is not yet qualified (see
+  [limitations](limitations.md)); and
+- the pressure state is not physical, so these runs measure performance only.
+
+The fluid mesh uses the same 4 boxes for every GPU count. Times are means over
+steps 2–5; step 1 is warm-up.
+
+![20M-particle MFiX-Exa on 1-4 H100s](../figures/performance/mfix_20m_multi_gpu_cuda_aware.png)
+
+| GPUs | MPI buffers | Total s/step | Fluid | Coupling | Particles (DEM) | Neighbor exchange | vs. 1 GPU |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | — | 3.191 | 0.526 | 0.344 | 2.319 | 14.3 ms | 1.00× |
+| 2 | staged | 2.252 | 0.581 | 0.269 | 1.401 | 14.4 ms | 1.42× |
+| 2 | CUDA-aware | **2.151** | 0.523 | 0.255 | 1.373 | **5.8 ms** | **1.48×** |
+| 4 | staged | 1.730 | 0.562 | 0.075 | 1.093 | 12.9 ms | 1.84× |
+| 4 | CUDA-aware | **1.660** | 0.524 | 0.064 | 1.071 | **4.3 ms** | **1.92×** |
+
+**What the numbers show.**
+
+- With 20M particles the DEM stage dominates, so this case does strong-scale,
+  unlike the 56k-particle case in section 3. Four GPUs run the full coupled
+  step **1.92×** faster than one.
+- CUDA-aware MPI makes the DEM ghost-particle exchange **2.5×** (2 GPUs) and
+  **3.0×** (4 GPUs) faster, and the whole step about 4% faster.
+- The fluid stage stays near 0.53 s per step because the 4 fluid boxes do not
+  subdivide with more ranks. Particle ownership on 4 GPUs is also unbalanced
+  (1.7M to 9.2M particles per rank). Both are decomposition limits, not
+  communication limits.
+- CUDA-aware runs pay a one-time cost in step 1 while GPU-to-GPU (CUDA IPC)
+  links are set up: 0.22 s on 2 GPUs and 0.69 s on 4 GPUs.
+- Final velocity and wall pressure agree across all multi-GPU cases to about
+  seven significant figures.
+
+**A bug found and fixed on the way.** The first CUDA-aware 2-GPU run aborted
+in the step-2 nodal pressure solve, even though it matched the staged run
+through step 1. The standalone benchmark had used plain `cudaMalloc` buffers,
+whereas AMReX allocates from its own GPU memory pool. UCX's memory-type cache
+can then misclassify device memory. With `UCX_MEMTYPE_CACHE=n` every
+CUDA-aware run completed and matched the staged results. The setting is
+required when running this solver with CUDA-aware MPI.
+
 ## Engineering practices shown
 
 - **Profile before optimizing.** Stage timers, nested GPU timers, Nsight
@@ -257,5 +313,8 @@ unqualified (see [limitations](limitations.md)).
 - **Measure the communication path directly.** A CUDA-aware MPI
   microbenchmark quantified the gain over host staging and exposed fabric
   limitations, including missing GPUDirect RDMA and a broken UD transport.
+- **Carry microbenchmarks into the real solver.** CUDA-aware MPI was enabled
+  in the 20M-particle MFiX-Exa case, where it exposed and fixed a UCX
+  memory-type-cache failure with AMReX's pooled GPU allocator.
 - **Report negative results.** Multi-GPU slowdowns, slower fusions, and unsafe
   list reuse are documented alongside the wins.

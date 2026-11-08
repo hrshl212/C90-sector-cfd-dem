@@ -162,6 +162,54 @@ def plot_cuda_aware_mpi(data: Path, out: Path) -> None:
     plt.close(fig)
 
 
+def plot_mfix_multi_gpu(data: Path, out: Path) -> None:
+    table = rows(data / "mfix_20m_multi_gpu_cuda_aware.csv")
+    base = float(next(r for r in table if r["gpus"] == "1")["total_s"])
+    fig, (left, right) = plt.subplots(1, 2, figsize=(10.5, 4.3), dpi=150,
+                                      gridspec_kw={"width_ratios": [1.3, 1]})
+    order = [("1", "0"), ("2", "0"), ("2", "1"), ("4", "0"), ("4", "1")]
+    pick = {(r["gpus"], r["gpu_aware_mpi"]): r for r in table}
+    parts = (("fluid_s", "Fluid + pressure", GREEN),
+             ("coupling_s", "Fluid-particle coupling", RUST),
+             ("particles_s", "Particles (DEM)", SAND))
+    labels = [f"{g} GPU{'s' if g != '1' else ''}\n" + ("CUDA-aware" if a == "1" else ("staged" if g != "1" else "baseline"))
+              for g, a in order]
+    bottom = [0.0] * len(order)
+    for key, label, color in parts:
+        vals = [float(pick[o][key]) for o in order]
+        left.bar(range(len(order)), vals, bottom=bottom, color=color, label=label, width=0.62)
+        bottom = [b + v for b, v in zip(bottom, vals)]
+    for i, o in enumerate(order):
+        tot = float(pick[o]["total_s"])
+        left.text(i, tot + 0.05, f"{tot:.2f} s\n{base / tot:.2f}x", ha="center",
+                  fontsize=8.5, color=INK)
+    left.set_xticks(range(len(order)), labels, fontsize=8)
+    left.set_ylabel("Mean time per CFD step (s)", color=INK)
+    left.set_ylim(0, 4.0)
+    left.set_title("20M-particle MFiX-Exa step on 1-4 H100s",
+                   color=INK, loc="left", fontsize=11)
+    left.legend(frameon=False, fontsize=8, loc="upper right")
+    style(left)
+
+    gpus = ["2", "4"]
+    stg = [float(pick[(g, "0")]["neighbor_exchange_ms"]) for g in gpus]
+    dev = [float(pick[(g, "1")]["neighbor_exchange_ms"]) for g in gpus]
+    x = range(len(gpus))
+    right.bar([i - 0.19 for i in x], stg, 0.38, color=GRAY, label="AMReX staged")
+    right.bar([i + 0.19 for i in x], dev, 0.38, color=GREEN, label="CUDA-aware")
+    for i, (d, s_) in enumerate(zip(dev, stg)):
+        right.text(i, s_ + 0.4, f"{s_ / d:.1f}x", ha="center", fontsize=9, color=INK)
+    right.set_xticks(list(x), [f"{g} GPUs" for g in gpus], fontsize=9)
+    right.set_ylabel("Particle neighbor exchange (ms/step)", color=INK)
+    right.set_ylim(0, 18)
+    right.set_title("DEM ghost-particle exchange", color=INK, loc="left", fontsize=11)
+    right.legend(frameon=False, fontsize=8, loc="upper right")
+    style(right)
+    fig.tight_layout()
+    fig.savefig(out / "mfix_20m_multi_gpu_cuda_aware.png")
+    plt.close(fig)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, default=ROOT / "data" / "benchmarks")
@@ -171,6 +219,7 @@ def main() -> None:
     plot_capacity(args.data_dir, args.output_dir)
     plot_scaling(args.data_dir, args.output_dir)
     plot_cuda_aware_mpi(args.data_dir, args.output_dir)
+    plot_mfix_multi_gpu(args.data_dir, args.output_dir)
     print(f"wrote figures to {args.output_dir}")
 
 

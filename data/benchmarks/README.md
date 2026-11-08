@@ -39,3 +39,15 @@ to Open MPI's internal CUDA staging.
 Mean six-face halo-exchange time (slowest rank) with an `block_N^3` double
 block per GPU, including GPU pack and unpack. `face_bytes` is the size of one
 face message.
+
+## `mfix_20m_multi_gpu_cuda_aware.csv`
+
+Five-step coupled MFiX-Exa CFD-DEM runs with 20,009,859 particles on 1, 2, and
+4 H100s in one node, with AMReX `use_gpu_aware_mpi` off (`0`) or on (`1`).
+Time columns are means over steps 2–5 (step 1 is warm-up). The fluid mesh is
+4 boxes for every GPU count. `particles_s` is the DEM time per CFD step
+(two DEM substeps). `neighbor_exchange_ms` is the slowest rank's particle
+neighbor-exchange time per CFD step. `first_step_neighbor_exchange_ms` shows
+the one-time setup cost of GPU-to-GPU links. `max_rank_particles` is the
+largest particle count owned by one rank. This is a performance configuration
+with the cyclic boundary disabled, not a physics result.
